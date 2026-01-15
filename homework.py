@@ -23,9 +23,21 @@ st.markdown("""
         border-left: 5px solid #00cc66 !important;
         background-color: #f0fff4 !important;
     }
-    .hw-subject { font-weight: bold; font-size: 1.1em; color: #333; }
-    .hw-date { font-size: 0.85em; color: #666; }
-    .hw-content { margin-top: 8px; font-size: 1em; }
+    /* 強制指定標題為深灰色，避免在深色模式下變白 */
+    .hw-subject { font-weight: bold; font-size: 1.1em; color: #333333 !important; }
+    
+    /* 強制指定日期為灰色 */
+    .hw-date { font-size: 0.85em; color: #666666 !important; }
+    
+    /* 👇 修正重點在這裡！強制指定內容為黑色，並保留換行 */
+    .hw-content { 
+        margin-top: 8px; 
+        font-size: 1em; 
+        color: #000000 !important; 
+        font-weight: 500;
+        white-space: pre-wrap; /* 讓內容可以換行顯示 */
+    }
+    
     .block-container { padding-bottom: 50px; }
 </style>
 """, unsafe_allow_html=True)
@@ -36,7 +48,6 @@ def get_connection():
         conn = st.secrets["connections"]["gsheets"]
         info = conn["service_account_info"]
         url = conn["spreadsheet"]
-        
         creds = service_account.Credentials.from_service_account_info(
             info, scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         )
@@ -48,12 +59,19 @@ def get_connection():
 
 sheet = get_connection()
 
-# 讀取資料
+# --- 讀取資料 (自動適應版) ---
 try:
-    data = sheet.get_all_records()
-    df = pd.DataFrame(data if data else [], columns=["ID", "科目", "指派日期", "繳交期限", "內容", "備註", "狀態"])
-    # 👇 這一行就是消滅 'nan' 的關鍵！把空值變成空字串
-    df = df.fillna("")
+    # 使用 get_all_values() 抓取原始資料，避免標題對不上的問題
+    raw_data = sheet.get_all_values()
+    
+    if len(raw_data) > 1:
+        headers = raw_data[0]
+        rows = raw_data[1:]
+        # 強制指定欄位名稱，對應 Google Sheet 的第 1 到 7 欄
+        df = pd.DataFrame(rows, columns=["ID", "科目", "指派日期", "繳交期限", "內容", "備註", "狀態"])
+        df = df.fillna("")
+    else:
+        df = pd.DataFrame(columns=["ID", "科目", "指派日期", "繳交期限", "內容", "備註", "狀態"])
 except:
     df = pd.DataFrame()
 
@@ -96,7 +114,7 @@ with tab1:
             assign_str = str(assign_date)
             new_id = len(df) + 1
             
-            # 寫入前先確認欄位順序對不對，這裡預設 G欄是狀態
+            # 寫入
             sheet.append_row([
                 new_id, subject, assign_str, due_str, content, note, "未完成"
             ])
@@ -145,9 +163,23 @@ with tab2:
                 if row['狀態'] != "已完成":
                     if st.button("標記為完成", key=f"done_{row['ID']}"):
                         try:
-                            # 1. 重新抓取 ID 列表
                             all_ids = sheet.col_values(1)
+                            search_id = str(row['ID'])
+                            str_ids = [str(x) for x in all_ids]
                             
+                            if search_id in str_ids:
+                                target_row = str_ids.index(search_id) + 1
+                                # 更新第 7 欄 (狀態)
+                                sheet.update_cell(target_row, 7, "已完成")
+                                st.toast("太棒了！又完成一項作業！")
+                                st.rerun()
+                            else:
+                                st.error("找不到這筆作業 ID")
+                                
+                        except Exception as e:
+                            st.error(f"更新失敗: {e}")
+    else:
+        st.info("還沒有任何作業紀錄喔！")
                             # 2. 定位並更新
                             search_id = str(row['ID'])
                             str_ids = [str(x) for x in all_ids]
