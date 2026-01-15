@@ -84,16 +84,81 @@ with tab1:
         with c2:
             due_time = st.time_input("截止時間", datetime.now().time())
         
-        content = st.text_
+        content = st.text_area("作業內容", height=100, placeholder="例如：講義 P.20 ~ P.25")
+        note = st.text_input("備註 (選填)", placeholder="例如：要記得帶圖畫紙")
+        
+        submitted = st.form_submit_button("💾 儲存作業", use_container_width=True)
+
+    if submitted and content:
+        try:
+            due_str = f"{due_date} {due_time.strftime('%H:%M')}"
+            assign_str = str(assign_date)
+            new_id = len(df) + 1
+            
+            sheet.append_row([
+                new_id, subject, assign_str, due_str, content, note, "未完成"
+            ])
+            st.success(f"已新增：{subject} 作業！")
+            st.rerun()
+        except Exception as e:
+            st.error(f"儲存失敗：{e}")
+
+# ==========================================
+# 分頁 2: 作業清單
+# ==========================================
+with tab2:
+    st.subheader("待辦作業一覽")
+    
+    if not df.empty:
+        filter_status = st.radio("顯示狀態", ["全部", "未完成", "已完成"], horizontal=True)
+        
+        df_display = df.copy()
+        if filter_status == "未完成":
+            df_display = df_display[df_display['狀態'] != "已完成"]
+        elif filter_status == "已完成":
+            df_display = df_display[df_display['狀態'] == "已完成"]
+            
+        if df_display.empty:
+            st.info("目前沒有相關作業 🎉")
+        else:
+            for index, row in df_display.iterrows():
+                status_class = "hw-done" if row['狀態'] == "已完成" else ""
+                status_icon = "✅" if row['狀態'] == "已完成" else "⏳"
+                
+                # HTML 卡片顯示
+                html_card = f"""
+                <div class="hw-card {status_class}">
+                    <div class="hw-subject">{status_icon} {row['科目']}</div>
+                    <div class="hw-date">
+                        📅 指派：{row['指派日期']} <br>
+                        ⏰ 期限：<b>{row['繳交期限']}</b>
+                    </div>
+                    <div class="hw-content">{row['內容']}</div>
+                    <div style="color:gray; font-size:0.8em; margin-top:5px;">備註：{row['備註']}</div>
+                </div>
+                """
+                st.markdown(html_card, unsafe_allow_html=True)
+                
+                # 按鈕與更新邏輯
+                if row['狀態'] != "已完成":
+                    if st.button("標記為完成", key=f"done_{row['ID']}"):
+                        try:
+                            # 1. 重新抓取 ID 列表
+                            all_ids = sheet.col_values(1)
                             
-                            # 2. 搜尋這個 ID 在第幾行 (轉成字串比對最安全)
-                            # index() 也是從 0 開始，所以要 +1
-                            # 但因為 all_ids 包含標題，所以其實 ID=1 應該在 index 1 (Row 2)
-                            # 所以這裡的 logic 是：找到這個 ID 在 list 中的位置，該位置+1 就是 Row Number
-                            search_id = str(row
-                        sheet.update_cell(target_row, 7, "已完成") # 更新G欄狀態
-                        st.toast("太棒了！又完成一項作業！")
-                        st.rerun()
+                            # 2. 定位 (這裡一定要縮排對齊)
+                            search_id = str(row['ID'])
+                            str_ids = [str(x) for x in all_ids]
+                            
+                            if search_id in str_ids:
+                                target_row = str_ids.index(search_id) + 1
+                                sheet.update_cell(target_row, 7, "已完成")
+                                st.toast("太棒了！又完成一項作業！")
+                                st.rerun()
+                            else:
+                                st.error("找不到這筆作業 ID")
+                                
+                        except Exception as e:
+                            st.error(f"更新失敗: {e}")
     else:
         st.info("還沒有任何作業紀錄喔！")
-      
