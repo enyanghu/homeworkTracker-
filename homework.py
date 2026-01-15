@@ -106,15 +106,4 @@ with tab1:
         
         submitted = st.form_submit_button("💾 儲存作業", use_container_width=True)
 
-    if submitted and content:
-        try:
-            due_str = f"{due_date} {due_time.strftime('%H:%M')}"
-                                st.toast("太棒了！又完成一項作業！")
-                                st.rerun()
-                            else:
-                                st.error("找不到這筆作業 ID")
-                                
-                        except Exception as e:
-                            st.error(f"更新失敗: {e}")
-    else:
-        st.info("還沒有任何作業紀錄喔！")
+    if submitted and content
