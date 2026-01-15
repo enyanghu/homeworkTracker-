@@ -1,0 +1,156 @@
+import streamlit as st
+import pandas as pd
+from datetime import datetime, date
+import gspread
+from google.oauth2 import service_account
+
+# --- 1. 頁面設定 ---
+st.set_page_config(page_title="功課紀錄本", page_icon="📚", layout="centered")
+st.title("📚 學生功課紀錄本")
+
+# 自訂 CSS：美化卡片與狀態
+st.markdown("""
+<style>
+    .hw-card {
+        background-color: #ffffff;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-left: 5px solid #ff4b4b; /* 預設紅色代表未完成 */
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+    }
+    .hw-done {
+        border-left: 5px solid #00cc66 !important; /* 綠色代表完成 */
+        background-color: #f0fff4 !important;
+    }
+    .hw-subject { font-weight: bold; font-size: 1.1em; color: #333; }
+    .hw-date { font-size: 0.85em; color: #666; }
+    .hw-content { margin-top: 8px; font-size: 1em; }
+    .block-container { padding-bottom: 50px; }
+</style>
+""", unsafe_allow_html=True)
+
+# --- 2. 連線設定 ---
+def get_connection():
+    try:
+        conn = st.secrets["connections"]["gsheets"]
+        creds = service_account.Credentials.from_service_account_info(
+            conn["service_account_info"],
+            scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        )
+        client = gspread.authorize(creds)
+        return client.open_by_url(conn["spreadsheet"]).sheet1
+    except Exception as e:
+        st.error(f"連線失敗，請檢查 Secrets 網址是否已更新。\n錯誤: {e}")
+        st.stop()
+
+sheet = get_connection()
+
+# 讀取資料
+try:
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data if data else [], columns=["ID", "科目", "指派日期", "繳交期限", "內容", "備註", "狀態"])
+except:
+    df = pd.DataFrame()
+
+# --- 3. 介面分頁 ---
+tab1, tab2 = st.tabs(["📝 登記作業", "📋 作業清單"])
+
+# ==========================================
+# 分頁 1: 登記作業
+# ==========================================
+with tab1:
+    st.subheader("新增一項作業")
+    
+    with st.form("hw_form", clear_on_submit=True):
+        # 科目選單 (包含細項)
+        subjects = [
+            "國文", "英文", "數學",
+            "自然 - 生物", "自然 - 物理",
+            "社會 - 地理", "社會 - 歷史", "社會 - 公民"
+        ]
+        col_sub, col_date = st.columns([1, 1])
+        with col_sub:
+            subject = st.selectbox("科目", subjects)
+        with col_date:
+            assign_date = st.date_input("指派日期", date.today())
+        
+        # 繳交期限 (日期 + 時間)
+        st.write("繳交期限")
+        c1, c2 = st.columns(2)
+        with c1:
+            due_date = st.date_input("截止日期", date.today())
+        with c2:
+            due_time = st.time_input("截止時間", datetime.now().time())
+        
+        content = st.text_area("作業內容", height=100, placeholder="例如：講義 P.20 ~ P.25")
+        note = st.text_input("備註 (選填)", placeholder="例如：要記得帶圖畫紙")
+        
+        submitted = st.form_submit_button("💾 儲存作業", use_container_width=True)
+
+    if submitted and content:
+        try:
+            # 組合繳交時間字串
+            due_str = f"{due_date} {due_time.strftime('%H:%M')}"
+            assign_str = str(assign_date)
+            new_id = len(df) + 1
+            
+            # 寫入 Google Sheet
+            sheet.append_row([
+                new_id, subject, assign_str, due_str, content, note, "未完成"
+            ])
+            st.success(f"已新增：{subject} 作業！")
+            st.rerun()
+        except Exception as e:
+            st.error(f"儲存失敗：{e}")
+
+# ==========================================
+# 分頁 2: 作業清單
+# ==========================================
+with tab2:
+    st.subheader("待辦作業一覽")
+    
+    if not df.empty:
+        # 1. 篩選功能
+        filter_status = st.radio("顯示狀態", ["全部", "未完成", "已完成"], horizontal=True)
+        
+        # 2. 資料處理與排序 (依照繳交期限排序)
+        df_display = df.copy()
+        if filter_status == "未完成":
+            df_display = df_display[df_display['狀態'] != "已完成"]
+        elif filter_status == "已完成":
+            df_display = df_display[df_display['狀態'] == "已完成"]
+            
+        # 顯示卡片
+        if df_display.empty:
+            st.info("目前沒有相關作業 🎉")
+        else:
+            # 反轉順序顯示（新加入的在上面，或者你可以改成依日期排序）
+            # 這裡我們用「未完成」放上面
+            for index, row in df_display.iterrows():
+                status_class = "hw-done" if row['狀態'] == "已完成" else ""
+                status_icon = "✅" if row['狀態'] == "已完成" else "⏳"
+                
+                st.markdown(f"""
+                <div class="hw-card {status_class}">
+                    <div class="hw-subject">{status_icon} {row['科目']}</div>
+                    <div class="hw-date">
+                        📅 指派：{row['指派日期']} <br>
+                        ⏰ 期限：<b>{row['繳交期限']}</b>
+                    </div>
+                    <div class="hw-content">{row['內容']}</div>
+                    <div style="color:gray; font-size:0.8em; margin-top:5px;">備註：{row['備註']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # 完成按鈕 (只有未完成時才顯示)
+                if row['狀態'] != "已完成":
+                    if st.button("標記為完成", key=f"done_{row['ID']}"):
+                        # 更新 Google Sheet (ID 對應 Row+1)
+                        target_row = int(row['ID']) + 1
+                        sheet.update_cell(target_row, 7, "已完成") # 更新G欄狀態
+                        st.toast("太棒了！又完成一項作業！")
+                        st.rerun()
+    else:
+        st.info("還沒有任何作業紀錄喔！")
+      
