@@ -8,7 +8,7 @@ from google.oauth2 import service_account
 st.set_page_config(page_title="功課紀錄本", page_icon="📚", layout="centered")
 st.title("📚 學生功課紀錄本")
 
-# CSS: 美化卡片與狀態
+# CSS: 美化卡片與狀態 (包含深色模式文字修正)
 st.markdown("""
 <style>
     .hw-card {
@@ -23,19 +23,19 @@ st.markdown("""
         border-left: 5px solid #00cc66 !important;
         background-color: #f0fff4 !important;
     }
-    /* 強制指定標題為深灰色，避免在深色模式下變白 */
+    /* 強制指定標題為深灰色 */
     .hw-subject { font-weight: bold; font-size: 1.1em; color: #333333 !important; }
     
     /* 強制指定日期為灰色 */
     .hw-date { font-size: 0.85em; color: #666666 !important; }
     
-    /* 👇 修正重點在這裡！強制指定內容為黑色，並保留換行 */
+    /* 強制指定內容為黑色，並保留換行 */
     .hw-content { 
         margin-top: 8px; 
         font-size: 1em; 
         color: #000000 !important; 
         font-weight: 500;
-        white-space: pre-wrap; /* 讓內容可以換行顯示 */
+        white-space: pre-wrap;
     }
     
     .block-container { padding-bottom: 50px; }
@@ -61,13 +61,13 @@ sheet = get_connection()
 
 # --- 讀取資料 (自動適應版) ---
 try:
-    # 使用 get_all_values() 抓取原始資料，避免標題對不上的問題
+    # 使用 get_all_values() 抓取原始資料
     raw_data = sheet.get_all_values()
     
     if len(raw_data) > 1:
         headers = raw_data[0]
         rows = raw_data[1:]
-        # 強制指定欄位名稱，對應 Google Sheet 的第 1 到 7 欄
+        # 強制指定欄位名稱
         df = pd.DataFrame(rows, columns=["ID", "科目", "指派日期", "繳交期限", "內容", "備註", "狀態"])
         df = df.fillna("")
     else:
@@ -116,38 +116,7 @@ with tab1:
             
             # 寫入
             sheet.append_row([
-                new_id, subject, assign_str, due_str, content, note, "未完成"
-            ])
-            st.success(f"已新增：{subject} 作業！")
-            st.rerun()
-        except Exception as e:
-            st.error(f"儲存失敗：{e}")
-
-# ==========================================
-# 分頁 2: 作業清單
-# ==========================================
-with tab2:
-    st.subheader("待辦作業一覽")
-    
-    if not df.empty:
-        filter_status = st.radio("顯示狀態", ["全部", "未完成", "已完成"], horizontal=True)
-        
-        df_display = df.copy()
-        if filter_status == "未完成":
-            df_display = df_display[df_display['狀態'] != "已完成"]
-        elif filter_status == "已完成":
-            df_display = df_display[df_display['狀態'] == "已完成"]
-            
-        if df_display.empty:
-            st.info("目前沒有相關作業 🎉")
-        else:
-            for index, row in df_display.iterrows():
-                status_class = "hw-done" if row['狀態'] == "已完成" else ""
-                status_icon = "✅" if row['狀態'] == "已完成" else "⏳"
-                
-                # HTML 卡片顯示
-                html_card = f"""
-                <div class="hw-card {status_class}">
+                new_id, subject, assign
                     <div class="hw-subject">{status_icon} {row['科目']}</div>
                     <div class="hw-date">
                         📅 指派：{row['指派日期']} <br>
