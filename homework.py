@@ -114,7 +114,7 @@ with tab2:
         # 1. 篩選功能
         filter_status = st.radio("顯示狀態", ["全部", "未完成", "已完成"], horizontal=True)
         
-        # 2. 資料處理與排序 (依照繳交期限排序)
+        # 2. 資料處理與排序
         df_display = df.copy()
         if filter_status == "未完成":
             df_display = df_display[df_display['狀態'] != "已完成"]
@@ -125,8 +125,7 @@ with tab2:
         if df_display.empty:
             st.info("目前沒有相關作業 🎉")
         else:
-            # 反轉順序顯示（新加入的在上面，或者你可以改成依日期排序）
-            # 這裡我們用「未完成」放上面
+            # 反轉順序顯示
             for index, row in df_display.iterrows():
                 status_class = "hw-done" if row['狀態'] == "已完成" else ""
                 status_icon = "✅" if row['狀態'] == "已完成" else "⏳"
@@ -143,11 +142,18 @@ with tab2:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # 完成按鈕 (只有未完成時才顯示)
+                # --- 修正後的按鈕邏輯 ---
                 if row['狀態'] != "已完成":
                     if st.button("標記為完成", key=f"done_{row['ID']}"):
-                        # 更新 Google Sheet (ID 對應 Row+1)
-                        target_row = int(row['ID']) + 1
+                        try:
+                            # 1. 重新抓取一次最新的 ID 列表 (A欄)
+                            all_ids = sheet.col_values(1)
+                            
+                            # 2. 搜尋這個 ID 在第幾行 (轉成字串比對最安全)
+                            # index() 也是從 0 開始，所以要 +1
+                            # 但因為 all_ids 包含標題，所以其實 ID=1 應該在 index 1 (Row 2)
+                            # 所以這裡的 logic 是：找到這個 ID 在 list 中的位置，該位置+1 就是 Row Number
+                            search_id = str(row
                         sheet.update_cell(target_row, 7, "已完成") # 更新G欄狀態
                         st.toast("太棒了！又完成一項作業！")
                         st.rerun()
