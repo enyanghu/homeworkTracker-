@@ -33,7 +33,6 @@ st.markdown("""
 # --- 2. 連線設定 ---
 def get_connection():
     try:
-        # 拆開寫，避免複製時斷行
         conn = st.secrets["connections"]["gsheets"]
         info = conn["service_account_info"]
         url = conn["spreadsheet"]
@@ -53,6 +52,8 @@ sheet = get_connection()
 try:
     data = sheet.get_all_records()
     df = pd.DataFrame(data if data else [], columns=["ID", "科目", "指派日期", "繳交期限", "內容", "備註", "狀態"])
+    # 👇 這一行就是消滅 'nan' 的關鍵！把空值變成空字串
+    df = df.fillna("")
 except:
     df = pd.DataFrame()
 
@@ -95,6 +96,7 @@ with tab1:
             assign_str = str(assign_date)
             new_id = len(df) + 1
             
+            # 寫入前先確認欄位順序對不對，這裡預設 G欄是狀態
             sheet.append_row([
                 new_id, subject, assign_str, due_str, content, note, "未完成"
             ])
@@ -146,12 +148,13 @@ with tab2:
                             # 1. 重新抓取 ID 列表
                             all_ids = sheet.col_values(1)
                             
-                            # 2. 定位 (這裡一定要縮排對齊)
+                            # 2. 定位並更新
                             search_id = str(row['ID'])
                             str_ids = [str(x) for x in all_ids]
                             
                             if search_id in str_ids:
                                 target_row = str_ids.index(search_id) + 1
+                                # 這裡更新的是第 7 欄 (G欄)，請確認 G欄標題是「狀態」
                                 sheet.update_cell(target_row, 7, "已完成")
                                 st.toast("太棒了！又完成一項作業！")
                                 st.rerun()
