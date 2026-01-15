@@ -106,4 +106,51 @@ with tab1:
         
         submitted = st.form_submit_button("💾 儲存作業", use_container_width=True)
 
-    if submitted and content：
+    # 👇 這裡就是原本缺少冒號的地方，我已經補上了 (:)
+    if submitted and content:
+        try:
+            due_str = f"{due_date} {due_time.strftime('%H:%M')}"
+            assign_str = str(assign_date)
+            new_id = len(df) + 1
+            sheet.append_row([
+                new_id, subject, assign_str, due_str, content, note, "未完成"
+            ])
+            st.success(f"已新增：{subject} 作業！")
+            st.rerun()
+        except Exception as e:
+            st.error(f"儲存失敗：{e}")
+
+# ==========================================
+# 分頁 2: 作業清單
+# ==========================================
+with tab2:
+    st.subheader("待辦作業一覽")
+    
+    if not df.empty:
+        filter_status = st.radio("顯示狀態", ["全部", "未完成", "已完成"], horizontal=True)
+        
+        df_display = df.copy()
+        if filter_status == "未完成":
+            df_display = df_display[df_display['狀態'] != "已完成"]
+        elif filter_status == "已完成":
+            df_display = df_display[df_display['狀態'] == "已完成"]
+            
+        if df_display.empty:
+            st.info("目前沒有相關作業 🎉")
+        else:
+            for index, row in df_display.iterrows():
+                status_class = "hw-done" if row['狀態'] == "已完成" else ""
+                status_icon = "✅" if row['狀態'] == "已完成" else "⏳"
+                
+                # --- 變數提取 ---
+                sub = row['科目']
+                assign = row['指派日期']
+                due = row['繳交期限']
+                cont = row['內容']
+                nt = row['備註']
+                
+                # --- HTML 拼裝 ---
+                html_card = ""
+                html_card += f'<div class="hw-card {status_class}">'
+                html_card += f'<div class="hw-subject">{status_icon} {sub}</div>'
+                html_card += f'<div class="hw-
