@@ -8,7 +8,7 @@ from google.oauth2 import service_account
 st.set_page_config(page_title="功課紀錄本", page_icon="📚", layout="centered")
 st.title("📚 學生功課紀錄本")
 
-# CSS: 美化卡片與狀態
+# CSS: 美化卡片
 st.markdown("""
 <style>
     .hw-card {
@@ -23,8 +23,15 @@ st.markdown("""
         border-left: 5px solid #00cc66 !important;
         background-color: #f0fff4 !important;
     }
-    .hw-subject { font-weight: bold; font-size: 1.1em; color: #333333 !important; }
-    .hw-date { font-size: 0.85em; color: #666666 !important; }
+    .hw-subject { 
+        font-weight: bold; 
+        font-size: 1.1em; 
+        color: #333333 !important; 
+    }
+    .hw-date { 
+        font-size: 0.85em; 
+        color: #666666 !important; 
+    }
     .hw-content { 
         margin-top: 8px; 
         font-size: 1em; 
@@ -94,60 +101,14 @@ with tab1:
         with c2:
             due_time = st.time_input("截止時間", datetime.now().time())
         
-        content = st.text_area("作業內容", height=100, placeholder="例如：講義 P.20 ~ P.25")
-        note = st.text_input("備註 (選填)", placeholder="例如：要記得帶圖畫紙")
+        content = st.text_area("作業內容", height=100)
+        note = st.text_input("備註 (選填)")
         
         submitted = st.form_submit_button("💾 儲存作業", use_container_width=True)
 
     if submitted and content:
         try:
             due_str = f"{due_date} {due_time.strftime('%H:%M')}"
-            assign_str = str(assign_date)
-            new_id = len(df) + 1
-            sheet.append_row([
-                new_id, subject, assign_str, due_str, content, note, "未完成"
-            ])
-            st.success(f"已新增：{subject} 作業！")
-            st.rerun()
-        except Exception as e:
-            st.error(f"儲存失敗：{e}")
-
-# ==========================================
-# 分頁 2: 作業清單
-# ==========================================
-with tab2:
-    st.subheader("待辦作業一覽")
-    
-    if not df.empty:
-        filter_status = st.radio("顯示狀態", ["全部", "未完成", "已完成"], horizontal=True)
-        
-        df_display = df.copy()
-        if filter_status == "未完成":
-            df_display = df_display[df_display['狀態'] != "已完成"]
-        elif filter_status == "已完成":
-            df_display = df_display[df_display['狀態'] == "已完成"]
-            
-        if df_display.empty:
-            st.info("目前沒有相關作業 🎉")
-        else:
-            for index, row in df_display.iterrows():
-                status_class = "hw-done" if row['狀態'] == "已完成" else ""
-                status_icon = "✅" if row['狀態'] == "已完成" else "⏳"
-                
-                # --- 👇 改成一行一行接起來，避免手機複製時斷行出錯 ---
-                html_card = ""
-                html_card += f'<div class="hw-card {status_class}">'
-                html_card += f'<div class="hw-subject">{status_icon} {row["科目"]}</div>'
-                html_card += f'<div class="hw-date
-        st.info("還沒有任何作業紀錄喔！")
-                            # 2. 定位並更新
-                            search_id = str(row['ID'])
-                            str_ids = [str(x) for x in all_ids]
-                            
-                            if search_id in str_ids:
-                                target_row = str_ids.index(search_id) + 1
-                                # 這裡更新的是第 7 欄 (G欄)，請確認 G欄標題是「狀態」
-                                sheet.update_cell(target_row, 7, "已完成")
                                 st.toast("太棒了！又完成一項作業！")
                                 st.rerun()
                             else:
