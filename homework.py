@@ -59,21 +59,26 @@ def get_connection():
 
 sheet = get_connection()
 
-# --- 讀取資料 ---
+# --- 讀取資料 (修復版：忽略 H 欄的群組 ID) ---
 try:
     raw = sheet.get_all_values()
     cols = ["ID", "科目", "指派日期", "繳交期限", "內容", "備註", "狀態"]
     
     if len(raw) > 1:
         # 有資料：跳過標題列
-        df = pd.DataFrame(raw[1:], columns=cols)
+        # 👇 關鍵修改： [row[:7] ...] 
+        # 這句的意思是：不管每一列有多長，我只抓前 7 個格子，這樣就不會被 H 欄的 ID 影響了！
+        clean_data = [row[:7] for row in raw[1:]]
+        
+        df = pd.DataFrame(clean_data, columns=cols)
         df = df.fillna("") # 填補空值
     else:
         # 無資料：建立空表
         df = pd.DataFrame(columns=cols)
-except:
+except Exception as e:
+    # 這裡可以把錯誤印出來方便除錯，但在網頁上我們先保持回傳空表
+    print(f"讀取錯誤: {e}")
     df = pd.DataFrame()
-
 # --- 3. 介面分頁 ---
 tab1, tab2 = st.tabs(["📝 登記作業", "📋 作業清單"])
 
